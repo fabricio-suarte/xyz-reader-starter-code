@@ -8,20 +8,22 @@ import android.database.Cursor;
 import android.graphics.Bitmap;
 import android.graphics.Color;
 import android.graphics.Rect;
-import android.graphics.Typeface;
 import android.graphics.drawable.ColorDrawable;
 
 import java.text.ParseException;
 import java.text.SimpleDateFormat;
 import java.util.Date;
 import java.util.GregorianCalendar;
+import java.util.Locale;
 
 import android.os.Bundle;
 import android.support.v4.app.ShareCompat;
 import android.support.v7.graphics.Palette;
-import android.text.Html;
+import android.text.Spannable;
+import android.text.SpannableString;
 import android.text.format.DateUtils;
 import android.text.method.LinkMovementMethod;
+import android.text.style.ForegroundColorSpan;
 import android.util.Log;
 import android.view.LayoutInflater;
 import android.view.View;
@@ -61,7 +63,7 @@ public class ArticleDetailFragment extends Fragment implements
     private boolean mIsCard = false;
     private int mStatusBarFullOpacityBottom;
 
-    private SimpleDateFormat dateFormat = new SimpleDateFormat("yyyy-MM-dd'T'HH:mm:ss.sss");
+    private SimpleDateFormat dateFormat = new SimpleDateFormat("yyyy-MM-dd'T'HH:mm:ss.sss", Locale.US);
     // Use default locale format
     private SimpleDateFormat outputFormat = new SimpleDateFormat();
     // Most time functions can only handle 1902 - 2037
@@ -213,25 +215,41 @@ public class ArticleDetailFragment extends Fragment implements
             mRootView.animate().alpha(1);
             titleView.setText(mCursor.getString(ArticleLoader.Query.TITLE));
             Date publishedDate = parsePublishedDate();
+
+            Spannable lineViewSpannable;
+            String author = mCursor.getString(ArticleLoader.Query.AUTHOR);
+            int authorIndex;
+            String auxLineView;
+
             if (!publishedDate.before(START_OF_EPOCH.getTime())) {
-                bylineView.setText(Html.fromHtml(
-                        DateUtils.getRelativeTimeSpanString(
+
+                auxLineView = DateUtils.getRelativeTimeSpanString(
                                 publishedDate.getTime(),
                                 System.currentTimeMillis(), DateUtils.HOUR_IN_MILLIS,
                                 DateUtils.FORMAT_ABBREV_ALL).toString()
-                                + " by <font color='#ffffff'>"
-                                + mCursor.getString(ArticleLoader.Query.AUTHOR)
-                                + "</font>"));
+                                + " by " + author;
 
             } else {
                 // If date is before 1902, just show the string
-                bylineView.setText(Html.fromHtml(
-                        outputFormat.format(publishedDate) + " by <font color='#ffffff'>"
-                        + mCursor.getString(ArticleLoader.Query.AUTHOR)
-                                + "</font>"));
-
+                auxLineView = outputFormat.format(publishedDate) + " by " + author;
             }
-            bodyView.setText(Html.fromHtml(mCursor.getString(ArticleLoader.Query.BODY).replaceAll("(\r\n|\n)", "<br />")));
+
+            //It was not possible to use the new Html.fromHtml(String, int) method without having
+            //to raise the min api version to 24! So I searched and figured out how to solve the issue
+            //(setting only the author name to white) in another way.
+
+            authorIndex = auxLineView.indexOf(author);
+
+            lineViewSpannable = new SpannableString(auxLineView);
+            lineViewSpannable.setSpan(new ForegroundColorSpan(Color.WHITE),
+                    authorIndex,
+                    authorIndex + author.length(),
+                    Spannable.SPAN_EXCLUSIVE_EXCLUSIVE);
+
+            bylineView.setText(lineViewSpannable, TextView.BufferType.SPANNABLE);
+
+            String body = mCursor.getString(ArticleLoader.Query.BODY);
+            bodyView.setText(body);
 
             ImageLoaderHelper.getInstance(getActivity()).getImageLoader()
                     .get(mCursor.getString(ArticleLoader.Query.PHOTO_URL), new ImageLoader.ImageListener() {
@@ -239,7 +257,7 @@ public class ArticleDetailFragment extends Fragment implements
                         public void onResponse(ImageLoader.ImageContainer imageContainer, boolean b) {
                             Bitmap bitmap = imageContainer.getBitmap();
                             if (bitmap != null) {
-                                Palette p = Palette.generate(bitmap, 12);
+                                Palette p = Palette.from(bitmap).generate();
                                 mMutedColor = p.getDarkMutedColor(0xFF333333);
                                 mPhotoView.setImageBitmap(imageContainer.getBitmap());
                                 mRootView.findViewById(R.id.meta_bar)

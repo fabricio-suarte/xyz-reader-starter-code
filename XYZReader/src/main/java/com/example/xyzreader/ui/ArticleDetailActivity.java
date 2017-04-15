@@ -8,9 +8,9 @@ import android.database.Cursor;
 import android.graphics.drawable.ColorDrawable;
 import android.os.Build;
 import android.os.Bundle;
+import android.support.annotation.RequiresApi;
 import android.support.v13.app.FragmentStatePagerAdapter;
 import android.support.v4.view.ViewPager;
-import android.support.v7.app.ActionBarActivity;
 import android.support.v7.app.AppCompatActivity;
 import android.util.TypedValue;
 import android.view.View;
@@ -21,11 +21,15 @@ import com.example.xyzreader.R;
 import com.example.xyzreader.data.ArticleLoader;
 import com.example.xyzreader.data.ItemsContract;
 
+import static android.os.Build.VERSION_CODES.KITKAT_WATCH;
+
 /**
  * An activity representing a single Article detail screen, letting you swipe between articles.
  */
 public class ArticleDetailActivity extends AppCompatActivity
         implements LoaderManager.LoaderCallbacks<Cursor> {
+
+    private static final String START_ID_KEY = "startId";
 
     private Cursor mCursor;
     private long mStartId;
@@ -60,7 +64,7 @@ public class ArticleDetailActivity extends AppCompatActivity
 
         mPager.setPageTransformer(true, new ZoomOutPageTransformer());
 
-        mPager.setOnPageChangeListener(new ViewPager.SimpleOnPageChangeListener() {
+        mPager.addOnPageChangeListener(new ViewPager.SimpleOnPageChangeListener() {
             @Override
             public void onPageScrollStateChanged(int state) {
                 super.onPageScrollStateChanged(state);
@@ -91,8 +95,11 @@ public class ArticleDetailActivity extends AppCompatActivity
 
         if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.LOLLIPOP) {
             mUpButtonContainer.setOnApplyWindowInsetsListener(new View.OnApplyWindowInsetsListener() {
+
+                @RequiresApi(KITKAT_WATCH)
                 @Override
                 public WindowInsets onApplyWindowInsets(View view, WindowInsets windowInsets) {
+
                     view.onApplyWindowInsets(windowInsets);
                     mTopInset = windowInsets.getSystemWindowInsetTop();
                     mUpButtonContainer.setTranslationY(mTopInset);
@@ -105,14 +112,21 @@ public class ArticleDetailActivity extends AppCompatActivity
         if (savedInstanceState == null) {
             if (getIntent() != null && getIntent().getData() != null) {
                 mStartId = ItemsContract.Items.getItemId(getIntent().getData());
-                mSelectedItemId = mStartId;
             }
         }
+        else {
+            mStartId = savedInstanceState.getLong(START_ID_KEY);
+        }
+
+        mSelectedItemId = mStartId;
     }
 
     @Override
-    protected void onStart() {
-        super.onStart();
+    protected void onSaveInstanceState(Bundle outState) {
+
+        outState.putLong(START_ID_KEY, mStartId);
+
+        super.onSaveInstanceState(outState);
     }
 
     @Override
@@ -141,7 +155,7 @@ public class ArticleDetailActivity extends AppCompatActivity
             mPagerAdapter.notifyDataSetChanged();
             mPager.setCurrentItem(position, false);
 
-            mStartId = 0;
+            //mStartId = 0;
         }
     }
 
